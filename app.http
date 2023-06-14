@@ -19,5 +19,5 @@ Content-Type: application/json
 }
 
 ###
-DELETE http://localhost:3000/tweets/5/
+GET http://localhost:3000/tweets/7/likes/
 Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6IkpvZUJpZGVuIiwiaWF0IjoxNjg2NDYyNzAxfQ.QaRTTbs0CDM3yT7dde5dQN-HHqMhguWicD8MrObPc6A
