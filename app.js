@@ -151,7 +151,7 @@ WHERE follower.follower_user_id = ${userId.user_id};`;
   if (
     userFollowers.some((item) => item.following_user_id === tweetResult.user_id)
   ) {
-    const getLikesAndReplies = `SELECT tweet.tweet,SUM(like.tweet_id) as likes,SUM(reply.tweet_id) as replies,tweet.date_time AS dateTime
+    const getLikesAndReplies = `SELECT tweet.tweet,COUNT(like.tweet_id) as likes,COUNT(reply.tweet_id) as replies,tweet.date_time AS dateTime
       FROM tweet INNER JOIN like ON tweet.tweet_id = like.tweet_id INNER JOIN reply ON tweet.tweet_id = reply.tweet_id WHERE tweet.tweet_id = ${tweetId};`;
     const getResponse = await db.get(getLikesAndReplies);
     response.send(getResponse);
@@ -169,26 +169,23 @@ app.get(
     let { tweetId } = request.params;
     const getUserIdQuery = `SELECT user_id FROM user WHERE username = '${username}';`;
     const userId = await db.get(getUserIdQuery);
-    const tweetsQuery = `SELECT * FROM tweet WHERE tweet_id=${tweetId}`;
-    const tweetResult = await db.get(tweetsQuery);
-    const userFollowersQuery = `SELECT * FROM follower INNER JOIN user on user.user_id = follower.following_user_id WHERE follower.follower_user_id = ${userId.user_id};`;
-    const userFollowers = await db.all(userFollowersQuery);
-    let likesList = [];
-    if (
-      userFollowers.some(
-        (item) => item.following_user_id === tweetResult.user_id
-      )
-    ) {
-      for (let index = 0; index < userFollowers.length; index++) {
-        const element = userFollowers[index];
-        const getLikesAndReplies = `SELECT username FROM user WHERE user_id = ${element.following_user_id};`;
-        const getResponse = await db.get(getLikesAndReplies);
-        likesList.push(getResponse.username);
-      }
-      response.send({ likes: likesList });
+    const checkTheTweetUser = `
+  	  select * from tweet inner join follower on tweet.user_id = follower.following_user_id
+      where tweet.tweet_id = ${tweetId} and follower.follower_user_id = ${userId.user_id};`;
+
+    const tweet = await database.get(checkTheTweetUser);
+    if (tweet === undefined) {
+      /*send Invalid Request as response along with the status*/
     } else {
-      response.status(401);
-      response.send("Invalid Request");
+      const getlikesUserQuery = `
+          	select user.username
+          	from user inner join like on like.user_id = user.user_id
+          	where like.tweet_id = ${tweetId};`;
+      const likeuserInformation = await database.all(getlikesUserQuery);
+      const likes = likeuserInformation.map((user) => {
+        return user["username"];
+      });
+      response.send({ likes }); /*Sending the required response*/
     }
   }
 );
@@ -198,7 +195,7 @@ app.post("/user/tweets/", authenticateJwt, async (request, response) => {
   const { username } = request;
   const getUserIdQuery = `SELECT user_id FROM user WHERE username = '${username}';`;
   const userId = await db.get(getUserIdQuery);
-  const postTweet = `INSERT INTO tweet(tweet) VALUES('${tweet}'); WHERE tweet.user_id = ${userId.user_id};`;
+  const postTweet = `INSERT INTO tweet(tweet,user_id) VALUES('${tweet}',${userId.user_id}); WHERE tweet.user_id = ${userId.user_id};`;
   await db.run(postTweet);
   response.send("Created a Tweet");
 });
@@ -218,5 +215,16 @@ app.delete("/tweets/:tweetId/", authenticateJwt, async (request, response) => {
     response.status(401);
     response.send("Invalid Request");
   }
+});
+
+app.get("/user/tweets/", authenticateJwt, async (request, response) => {
+  const { username } = request;
+  const getUserIdQuery = `SELECT user_id FROM user WHERE username = '${username}';`;
+  const userId = await db.get(getUserIdQuery);
+  const getTweets = `SELECT tweet ,COUNT(like_id) as likes,COUNT(reply_id)as replies,date_time as dateTime
+                       FROM tweet INNER JOIN like ON tweet.tweet_id = like.tweet_id INNER JOIN reply ON tweet.tweet_id = reply.tweet_id
+                       WHERE tweet.user_id = ${userId.user_id};`;
+  const tweets = await db.all(getTweets);
+  console.log(tweets);
 });
 module.exports = app;
